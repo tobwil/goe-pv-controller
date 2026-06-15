@@ -97,6 +97,8 @@ class S:
             raw = max(self.netz+self.wb_leistung, 0)
         else:
             raw = max(self.netz+self.wb_leistung-self.batt, 0)
+        # pGrid can never exceed PV production (physics)
+        raw = min(raw, self.pv)
         return raw if raw >= 200 else 0
 
 @dataclass
