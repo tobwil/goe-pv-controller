@@ -93,7 +93,7 @@ class S:
         if self.netz < -50:
             if not hasattr(st, '_netz_import_since'):
                 st._netz_import_since = time.time()
-            if time.time() - st._netz_import_since > 3:
+            if time.time() - st._netz_import_since > 5:
                 return 0
             else:
                 # Still in grace period — use last valid pGrid if available
