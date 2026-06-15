@@ -147,11 +147,18 @@ class Ctrl:
         if s.wb_car in(0,1):
             d.action="WARTEN";d.reason="Auto voll"if s.wb_car==4 else"No car"
             self.pid.reset();self.ld=d;return d
-        # ── Below minimum → stop ──
-        min_p=c["goe"]["min_power_w"]
-        if s.pgrid<min_p:
-            d.action="STOP";d.reason=f"Uberschuss {s.pgrid:.0f}W < {min_p}W"
-            self.pid.reset();self.smooth_amps=0;self.ld=d;return d
+        # ── Below minimum → stop (with hysteresis) ──
+        stop_p=c["goe"].get("stop_power_w", c["goe"]["min_power_w"]-380)
+        start_p=c["goe"].get("start_power_w", c["goe"]["min_power_w"]+120)
+        was_stopped = self.ld and self.ld.action=="STOP"
+        if was_stopped:
+            if s.pgrid < start_p:
+                d.action="STOP";d.reason=f"Uberschuss {s.pgrid:.0f}W < start {start_p}W"
+                self.ld=d;return d
+        else:
+            if s.pgrid < stop_p:
+                d.action="STOP";d.reason=f"Uberschuss {s.pgrid:.0f}W < stop {stop_p}W"
+                self.pid.reset();self.smooth_amps=0;self.ld=d;return d
         # ── Phase switching ──
         pc=c["phase_switch"]
         now=time.time()

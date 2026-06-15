@@ -8,6 +8,8 @@ goe:
   max_amps: 12          # Hardware-Deckel (ama)
   min_amps: 6           # Minimum (unter 6A lädt kein Auto)
   min_power_w: 1380     # 1-phase Minimum (6A × 230V)
+  stop_power_w: 1000    # Stop when surplus drops below (hysteresis)
+  start_power_w: 1500   # Start only when surplus exceeds (hysteresis)
 
 pid:
   kp: 0.08              # Proportional-Gain: 100W Fehler → 0.8A Korrektur
