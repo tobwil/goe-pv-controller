@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>☀️ PV Wallbox Controller</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0b1120;color:#e2e8f0;min-height:100vh;padding:20px}
+.container{max-width:1000px;margin:0 auto}
+h1{font-size:1.3rem;color:#fbbf24;margin-bottom:4px}
+.subtitle{font-size:.75rem;color:#64748b;margin-bottom:16px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-size:.75rem;color:#94a3b8;background:#111827;border-radius:8px;padding:10px 14px;border:1px solid #1e293b}
+.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+.legend-pos{color:#34d399;font-weight:600}
+.legend-neg{color:#ef4444;font-weight:600}
+.dot-pv{background:#fbbf24}.dot-netz{background:#38bdf8}.dot-batt{background:#a78bfa}
+.dot-wb{background:#34d399}.dot-haus{background:#f97316}.dot-pgrid{background:#fb923c}
+.header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px}
+.status-bar{display:flex;gap:10px;align-items:center;font-size:.8rem}
+.badge{padding:4px 10px;border-radius:5px;font-weight:600;font-size:.75rem}
+.badge-sim{background:#334155;color:#fbbf24}
+.badge-live{background:#166534;color:#86efac}
+.toggle-btn{background:#334155;border:1px solid #475569;color:#e2e8f0;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s}
+.toggle-btn:hover{background:#475569}
+.toggle-live{background:#166534;border-color:#22c55e;color:#86efac}
+.toggle-live:hover{background:#14532d}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:14px}
+.card{background:#111827;border-radius:10px;padding:14px;border:1px solid #1e293b;position:relative;overflow:hidden}
+.card-label{font-size:.7rem;text-transform:uppercase;color:#64748b;margin-bottom:4px}
+.card-value{font-size:1.6rem;font-weight:700;display:flex;align-items:baseline;gap:4px}
+.card-unit{font-size:.75rem;color:#475569}
+.card-dir{font-size:.65rem;font-weight:600;margin-top:2px}
+.gauge{height:6px;border-radius:3px;margin-top:6px;background:#1e293b;position:relative;overflow:hidden}
+.gauge-fill{height:100%;border-radius:3px;transition:width .8s}
+.gauge-pos{position:absolute;left:50%;top:0;width:1px;height:100%;background:#475569}
+.pos{color:#34d399}.neg{color:#ef4444}.neutral{color:#94a3b8}
+.card-pv .card-value{color:#fbbf24}
+.card-netz .pos{color:#38bdf8}.card-netz .neg{color:#e879f9}
+.card-batt .pos{color:#f97316}.card-batt .neg{color:#a78bfa}
+.card-wb .card-value{color:#34d399}
+.card-haus .card-value{color:#f97316}
+.card-pgrid .card-value{color:#fb923c}
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;background:#111827;border-radius:10px;padding:14px;border:1px solid #1e293b;font-size:.8rem}
+.flow-node{text-align:center;min-width:60px}
+.flow-val{font-weight:700;font-size:1.1rem}
+.flow-label{font-size:.65rem;color:#64748b}
+.flow-arrow{color:#475569;font-size:1.2rem}
+.decision{background:#111827;border-radius:10px;padding:16px;margin-bottom:14px;text-align:center;border:2px solid #1e293b}
+.decision-action{font-size:1.2rem;font-weight:700;margin-bottom:4px}
+.decision-detail{color:#94a3b8;font-size:.8rem}
+.act-CHG{color:#34d399}.act-WARTEN{color:#94a3b8}.act-STOP{color:#ef4444}.act-SW{color:#fbbf24}
+.chart-box{background:#111827;border-radius:10px;padding:16px;margin-bottom:14px;border:1px solid #1e293b}
+.chart-title{font-size:.8rem;color:#94a3b8;margin-bottom:8px}
+.chart-legend{display:flex;gap:16px;margin-bottom:8px;font-size:.7rem}
+.chart-legend-item{display:flex;align-items:center;gap:4px}
+.chart-line{width:14px;height:3px;border-radius:2px}
+canvas{width:100%;height:250px;display:block}
+.log-box{background:#060b14;border-radius:10px;padding:12px;font-family:'JetBrains Mono',monospace;font-size:.72rem;max-height:280px;overflow-y:auto;border:1px solid #111827;line-height:1.5}
+.log-WURDE{color:#34d399}.log-NICHT{color:#475569}
+.refresh{font-size:.65rem;color:#334155;text-align:right;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header-row">
+  <div>
+    <h1>☀️ PV Wallbox Controller</h1>
+    <div class="subtitle">Go-e Controller — PV-Überschuss live</div>
+  </div>
+  <div class="status-bar">
+    <span style="font-size:.7rem;color:#475569">Zyklus <span id="cycles">0</span></span>
+    <span id="log-badge" class="badge" style="background:#1e293b;color:#94a3b8">📋 Log</span>
+    <button class="toggle-btn" id="log-btn" onclick="toggleLog()">📋 Log</button>
+  </div>
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><span class="legend-dot dot-pv"></span> PV = Photovoltaik</div>
+  <div class="legend-item"><span class="legend-dot dot-netz"></span> Netz: <span class="legend-pos">+ Einspeisung</span> / <span class="legend-neg">− Bezug</span></div>
+  <div class="legend-item"><span class="legend-dot dot-batt"></span> Batt: <span class="legend-pos">+ Entladung</span> / <span class="legend-neg">− Ladung</span></div>
+  <div class="legend-item"><span class="legend-dot dot-wb"></span> WB = Wallbox</div>
+  <div class="legend-item"><span class="legend-dot dot-haus"></span> Haus = Verbrauch (ohne WB)</div>
+  <div class="legend-item"><span class="legend-dot dot-pgrid"></span> pGrid = Überschuss für go-e</div>
+</div>
+
+<!-- CARDS -->
+<div class="cards">
+  <div class="card card-pv">
+    <div class="card-label">☀️ Photovoltaik</div>
+    <div class="card-value"><span id="pv">—</span><span class="card-unit">W</span></div>
+    <div class="card-dir neutral">WR1+WR2</div>
+  </div>
+  <div class="card card-netz">
+    <div class="card-label">⚡ Netz</div>
+    <div class="card-value"><span id="netz-val">—</span><span class="card-unit">W</span></div>
+    <div class="card-dir" id="netz-dir">—</div>
+    <div class="gauge"><div class="gauge-pos"></div><div class="gauge-fill" id="netz-gauge" style="width:50%;background:#38bdf8"></div></div>
+  </div>
+  <div class="card card-batt">
+    <div class="card-label">🔋 Batterie</div>
+    <div class="card-value"><span id="batt-val">—</span><span class="card-unit">W</span></div>
+    <div class="card-dir" id="batt-dir">—</div>
+    <div class="gauge"><div class="gauge-pos"></div><div class="gauge-fill" id="batt-gauge" style="width:50%;background:#a78bfa"></div></div>
+  </div>
+  <div class="card card-haus">
+    <div class="card-label">🏠 Hausverbrauch</div>
+    <div class="card-value"><span id="haus">—</span><span class="card-unit">W</span></div>
+    <div class="card-dir neutral">ohne Wallbox</div>
+  </div>
+  <div class="card card-wb">
+    <div class="card-label">🚗 Wallbox</div>
+    <div class="card-value"><span id="wb">—</span><span class="card-unit">W</span></div>
+    <div class="card-dir" id="wb-detail">—</div>
+  </div>
+  <div class="card card-pgrid">
+    <div class="card-label">📊 pGrid (Netz+WB−Batt)</div>
+    <div class="card-value"><span id="pgrid">—</span><span class="card-unit">W</span></div>
+    <div class="card-dir neutral">PV-Überschuss für go-e</div>
+  </div>
+</div>
+
+<!-- FLOW -->
+<div class="flow">
+  <div class="flow-node"><div class="flow-val" style="color:#fbbf24" id="flow-pv">—</div><div class="flow-label">PV ☀️</div></div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-node"><div class="flow-val" style="color:#f97316" id="flow-haus">—</div><div class="flow-label">Haus 🏠</div></div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-node"><div class="flow-val" style="color:#a78bfa" id="flow-batt">—</div><div class="flow-label">Batt 🔋</div></div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-node"><div class="flow-val" style="color:#34d399" id="flow-wb">—</div><div class="flow-label">WB 🚗</div></div>
+  <span class="flow-arrow">→</span>
+  <div class="flow-node"><div class="flow-val" style="color:#38bdf8" id="flow-netz">—</div><div class="flow-label">Netz ⚡</div></div>
+</div>
+
+<!-- DECISION -->
+<div class="decision">
+  <div class="decision-action" id="decision-text">⏳ Warte auf Daten…</div>
+  <div class="decision-detail" id="decision-reason"></div>
+  <div style="margin-top:6px;font-size:.75rem;color:#475569">
+    PID: <span id="pid-out">—</span> | Soll: <span id="target-info">—</span> | Auto: <span id="car-info">—</span>
+  </div>
+</div>
+
+<!-- REGELN -->
+<div style="background:#111827;border-radius:10px;padding:12px;margin-bottom:14px;border:1px solid #1e293b;font-size:.7rem;color:#94a3b8;line-height:1.6">
+<div style="font-size:.8rem;color:#e2e8f0;margin-bottom:6px">📐 Entscheidungsmatrix</div>
+<table style="width:100%;border-collapse:collapse">
+<tr style="color:#64748b"><th style="text-align:left;padding:2px 6px">pGrid</th><th style="text-align:left;padding:2px 6px">Phase</th><th style="text-align:left;padding:2px 6px">Ampere</th><th style="text-align:left;padding:2px 6px">Ladeleistung</th></tr>
+<tr><td style="padding:2px 6px;color:#ef4444">0 – 1.379W</td><td style="padding:2px 6px">—</td><td style="padding:2px 6px">0A</td><td style="padding:2px 6px">🛑 STOP</td></tr>
+<tr><td style="padding:2px 6px;color:#34d399">1.380 – 1.839W</td><td style="padding:2px 6px">1ph</td><td style="padding:2px 6px">6A</td><td style="padding:2px 6px">~1.380W</td></tr>
+<tr><td style="padding:2px 6px;color:#34d399">1.840 – 2.299W</td><td style="padding:2px 6px">1ph</td><td style="padding:2px 6px">8A</td><td style="padding:2px 6px">~1.840W</td></tr>
+<tr><td style="padding:2px 6px;color:#34d399">2.300 – 2.759W</td><td style="padding:2px 6px">1ph</td><td style="padding:2px 6px">10A</td><td style="padding:2px 6px">~2.300W</td></tr>
+<tr><td style="padding:2px 6px;color:#34d399">2.760 – 4.499W</td><td style="padding:2px 6px">1ph</td><td style="padding:2px 6px">12A</td><td style="padding:2px 6px">~2.760W</td></tr>
+<tr style="border-top:1px solid #1e293b"><td style="padding:2px 6px;color:#38bdf8">4.500 – 5.519W</td><td style="padding:2px 6px">3ph</td><td style="padding:2px 6px">6A</td><td style="padding:2px 6px">~4.140W</td></tr>
+<tr><td style="padding:2px 6px;color:#38bdf8">5.520 – 6.899W</td><td style="padding:2px 6px">3ph</td><td style="padding:2px 6px">8A</td><td style="padding:2px 6px">~5.520W</td></tr>
+<tr><td style="padding:2px 6px;color:#38bdf8">6.900 – 8.279W</td><td style="padding:2px 6px">3ph</td><td style="padding:2px 6px">10A</td><td style="padding:2px 6px">~6.900W</td></tr>
+<tr><td style="padding:2px 6px;color:#38bdf8">&ge; 8.280W</td><td style="padding:2px 6px">3ph</td><td style="padding:2px 6px">12A</td><td style="padding:2px 6px">~8.280W</td></tr>
+</table>
+<div style="margin-top:6px;font-size:.65rem;color:#475569">
+🔄 1→3 ab 4.500W | 🔄 3→1 unter 3.200W | ⏱ max. alle 5 Min | Deadband 500W / 3A
+</div>
+</div>
+
+<!-- CHART -->
+<div class="chart-box">
+  <div class="chart-title">📈 Verlauf (letzte Stunde)</div>
+  <div class="chart-legend">
+    <div class="chart-legend-item"><span class="chart-line" style="background:#fbbf24"></span> PV</div>
+    <div class="chart-legend-item"><span class="chart-line" style="background:#fb923c"></span> pGrid (verfügbar)</div>
+    <div class="chart-legend-item"><span class="chart-line" style="background:#f472b6;border-style:dashed"></span> Soll-Ampere</div>
+    <div class="chart-legend-item"><span class="chart-line" style="background:#34d399;border-style:dotted"></span> Ist-Ampere</div>
+    <div class="chart-legend-item"><span class="chart-line" style="background:#38bdf8;border-style:dotted"></span> Ist-Watt</div>
+  </div>
+  <canvas id="chart" width="950" height="250"></canvas>
+</div>
+
+<!-- LOG -->
+<div style="margin-bottom:6px;color:#94a3b8;font-size:.8rem">📋 Entscheidungs-Log</div>
+<div class="log-box" id="log-box">Lade…</div>
+<div class="refresh">Aktualisiert alle 2s</div>
+</div>
+
+<script>
+const CAR_MAP = {0:'?',1:'Bereit',2:'Lädt',3:'Wartet',4:'Voll'};
+
+function fmtW(w){return Math.round(w)+'W'}
+
+function updateGauge(el, val, maxVal, color){
+  const pct = maxVal>0 ? Math.min(Math.abs(val)/maxVal*50, 50) : 0;
+  if(val >= 0){
+    el.style.width = (50+pct)+'%'; el.style.background = color;
+    el.style.marginLeft = '0';
+  } else {
+    el.style.width = pct+'%'; el.style.background = '#ef4444';
+    el.style.marginLeft = (50-pct)+'%';
+  }
+}
+
+function drawChart(history){
+  const canvas = document.getElementById('chart');
+  if(!canvas||!history||history.length<2)return;
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  const pad={top:15,right:50,bottom:25,left:45};
+  const pw=W-pad.left-pad.right, ph=H-pad.top-pad.bottom;
+  ctx.clearRect(0,0,W,H);
+
+  // Find ranges
+  let maxPV=0,maxA=12;
+  for(const p of history){
+    if(p.pv>maxPV)maxPV=p.pv;
+  }
+  maxPV=Math.ceil(maxPV/2000)*2000||4000;
+  if(maxPV<4000)maxPV=4000;
+
+  function x(i){return pad.left+(i/(history.length-1))*pw}
+  function y(v,max){return pad.top+ph-(v/max)*ph}
+
+  // Grid lines
+  ctx.strokeStyle='#1e293b';ctx.lineWidth=0.5;ctx.font='9px sans-serif';ctx.fillStyle='#475569';
+  for(let g=0;g<=maxPV;g+=1000){
+    const gy=y(g,maxPV);
+    ctx.beginPath();ctx.moveTo(pad.left,gy);ctx.lineTo(W-pad.right,gy);ctx.stroke();
+    ctx.fillText(g+'W',2,gy+3);
+  }
+  // Right axis labels (amps)
+  ctx.fillStyle='#f472b6';
+  for(let a=0;a<=12;a+=4){
+    const ay=y(a,maxPV/maxPV*12);  // map to right
+    ctx.fillText(a+'A',W-pad.right+4,ay+3);
+  }
+
+  // Draw PV line
+  ctx.strokeStyle='#fbbf24';ctx.lineWidth=1.5;ctx.beginPath();
+  for(let i=0;i<history.length;i++){
+    const px=x(i),py=y(history[i].pv,maxPV);
+    if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+
+  // Draw pGrid line
+  ctx.strokeStyle='#fb923c';ctx.lineWidth=1.5;ctx.beginPath();
+  for(let i=0;i<history.length;i++){
+    const px=x(i),py=y(history[i].pgrid,maxPV);
+    if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+  }
+  ctx.stroke();
+
+  // Draw Amps SOL line (dashed, right scale)
+  ctx.strokeStyle='#f472b6';ctx.lineWidth=2;ctx.setLineDash([4,4]);ctx.beginPath();
+  for(let i=0;i<history.length;i++){
+    const px=x(i),py=y(history[i].target_a||0,12);
+    if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+  }
+  ctx.stroke();ctx.setLineDash([]);
+
+  // Draw Amps IST line (dotted, right scale)
+  ctx.strokeStyle='#34d399';ctx.lineWidth=1.5;ctx.setLineDash([1,3]);ctx.beginPath();
+  for(let i=0;i<history.length;i++){
+    const px=x(i),py=y(history[i].wb_amps_ist||0,12);
+    if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+  }
+  ctx.stroke();ctx.setLineDash([]);
+
+  // Draw WB Watt IST line (dotted, left scale)
+  ctx.strokeStyle='#38bdf8';ctx.lineWidth=1;ctx.setLineDash([2,4]);ctx.beginPath();
+  for(let i=0;i<history.length;i++){
+    const px=x(i),py=y(history[i].wb_ist||0,maxPV);
+    if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+  }
+  ctx.stroke();ctx.setLineDash([]);
+
+  // Time labels
+  if(history.length>1){
+    const t0=new Date(history[0].ts*1000);
+    const t1=new Date(history[history.length-1].ts*1000);
+    ctx.fillStyle='#475569';ctx.font='9px sans-serif';
+    ctx.fillText(t0.toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'}),pad.left,H-6);
+    ctx.textAlign='right';
+    ctx.fillText(t1.toLocaleTimeString('de',{hour:'2-digit',minute:'2-digit'}),W-pad.right,H-6);
+    ctx.textAlign='start';
+  }
+}
+
+async function toggleLog(){
+  try{
+    const r=await fetch('/api/toggle_log',{method:'POST'});
+    const d=await r.json();
+    updateLogBadge(d.log_enabled);
+  }catch(e){console.error(e)}
+}
+
+function updateLogBadge(on){
+  const badge=document.getElementById('log-badge');
+  const btn=document.getElementById('log-btn');
+  if(on){
+    badge.style.background='#166534';badge.style.color='#86efac';badge.textContent='📋 Log AN';
+    btn.textContent='📋 Log AUS';
+  }else{
+    badge.style.background='#1e293b';badge.style.color='#64748b';badge.textContent='📋 Log AUS';
+    btn.textContent='📋 Log AN';
+  }
+}
+
+async function poll(){
+  try {
+    const r = await fetch('/api/state');
+    const d = await r.json();
+    const s = d.sensors||{}, dec = d.decision||{};
+
+    document.getElementById('pv').textContent = Math.round(s.pv_gesamt||0);
+    
+    const netz = s.netz||0;
+    document.getElementById('netz-val').textContent = Math.abs(Math.round(netz));
+    document.getElementById('netz-dir').innerHTML = netz>=0 ? '<span class="pos">↑ Einspeisung</span>' : '<span class="neg">↓ Bezug</span>';
+    updateGauge(document.getElementById('netz-gauge'), netz, 5000, '#38bdf8');
+    
+    const batt = s.batt||0;
+    const batSign = (s.haus_wr1||0) >= 0 ? 1 : -1;
+    const battSigned = batt * batSign;
+    document.getElementById('batt-val').textContent = Math.abs(Math.round(batt));
+    document.getElementById('batt-dir').innerHTML = batSign>=0 ? '<span class="pos">↑ Entladung</span>' : '<span class="neg">↓ Ladung</span>';
+    updateGauge(document.getElementById('batt-gauge'), battSigned, 3000, '#a78bfa');
+    
+    document.getElementById('haus').textContent = Math.round(s.haus_netto||0);
+    document.getElementById('wb').textContent = Math.round(s.wb_aktuell||0);
+    document.getElementById('pgrid').textContent = Math.round(s.pgrid||0);
+    
+    const car = s.wb_car||0;
+    document.getElementById('wb-detail').textContent = `${s.wb_amps||0}A | ${CAR_MAP[car]||car}`;
+    
+    document.getElementById('flow-pv').textContent = fmtW(s.pv_gesamt||0);
+    document.getElementById('flow-haus').textContent = fmtW(s.haus_netto||0);
+    document.getElementById('flow-batt').textContent = fmtW(battSigned||0);
+    document.getElementById('flow-wb').textContent = fmtW(s.wb_aktuell||0);
+    document.getElementById('flow-netz').textContent = fmtW(netz||0);
+    
+    const act = dec.action||'WARTEN';
+    const actLabels = {
+      CHG: `⚡ LÄDT: ${dec.target_amps||0}A ${dec.target_phases||3}-phasig`,
+      WARTEN: `⏳ ${dec.reason||'WARTEN'}`,
+      STOP: `🛑 ${dec.reason||'STOPP'}`,
+      SW: `🔄 ${dec.reason||'PHASENWECHSEL'}`
+    };
+    document.getElementById('decision-text').textContent = actLabels[act]||act;
+    document.getElementById('decision-text').className = 'decision-action act-'+act;
+    document.getElementById('decision-reason').textContent = dec.action==='CHG' ? `Erwartete Last: ~${(dec.target_amps||0)*230*(dec.target_phases||3)}W` : '';
+    document.getElementById('pid-out').textContent = (dec.pid_output||0).toFixed(1);
+    document.getElementById('target-info').textContent = `${dec.target_amps||0}A ${dec.target_phases||3}ph`;
+    document.getElementById('car-info').textContent = CAR_MAP[dec.car_status]||dec.car_status;
+    
+    updateLogBadge(d.log_enabled!==false);
+    document.getElementById('cycles').textContent = d.cycles||0;
+    
+    // Chart
+    if(d.history) drawChart(d.history);
+    
+    // Log
+    if(d.logs && d.logs.length){
+      const logBox = document.getElementById('log-box');
+      logBox.innerHTML = d.logs.map(l => {
+        const cls = l.includes('WURDE') ? 'log-WURDE' : 'log-NICHT';
+        return `<div class="${cls}">${l.substring(0,220)}</div>`;
+      }).reverse().join('');
+    }
+  } catch(e){ console.error(e); }
+}
+poll(); setInterval(poll,2000);
+</script>
+</body>
+</html>

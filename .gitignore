@@ -1,0 +1,17 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Secrets
+.env
+
+# Runtime data (auto-generated)
+history.json
+simulator.log
+simulator.log.*
+
+# IDE
+.vscode/
+.idea/

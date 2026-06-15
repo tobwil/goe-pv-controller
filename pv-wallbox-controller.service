@@ -1,0 +1,16 @@
+[Unit]
+Description=PV Wallbox Controller (Simulator)
+After=network.target home-assistant.service
+
+[Service]
+Type=simple
+User=one
+WorkingDirectory=/home/one/pv-wallbox-controller
+ExecStart=/home/one/pv-wallbox-controller/venv/bin/python /home/one/pv-wallbox-controller/web_ui.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

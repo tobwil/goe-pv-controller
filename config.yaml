@@ -1,0 +1,39 @@
+# PV Wallbox Controller — Konfiguration
+ha:
+  url: "http://localhost:8123"
+  token: ""  # HA Long-Lived Access Token → wird aus ENV gelesen: HA_TOKEN
+
+goe:
+  ip: "192.168.178.200"
+  max_amps: 12          # Hardware-Deckel (ama)
+  min_amps: 6           # Minimum (unter 6A lädt kein Auto)
+  min_power_w: 1380     # 1-phase Minimum (6A × 230V)
+
+pid:
+  kp: 0.08              # Proportional-Gain: 100W Fehler → 0.8A Korrektur
+  ki: 0.02              # Integral-Gain: summiert lange Fehler langsam auf
+  kd: 0.01              # Differential-Gain: dämpft schnelle Änderungen
+  setpoint: 0           # Ziel: 0W Netzeinspeisung
+  sample_time: 1.0      # PID tick in Sekunden
+  output_limits: [6, 12] # Ampere-Range
+
+phase_switch:
+  hysteresis_up: 4500
+  hysteresis_down: 3200
+  min_switch_interval: 300  # 5 Min zwischen Phasenwechseln
+
+deadband:
+  amps: 3               # Nur ändern wenn Δ ≥ 3A
+  watts: 500            # Nur ändern wenn Δ ≥ 500W
+
+simulation:
+  enabled: false        # false = LIVE steuern, true = nur loggen
+  log_file: "/home/one/pv-wallbox-controller/simulator.log"
+  log_interval: 5       # Alle 5s einen Eintrag schreiben
+
+history:
+  file: "/home/one/pv-wallbox-controller/history.json"
+
+web:
+  host: "0.0.0.0"
+  port: 8088
