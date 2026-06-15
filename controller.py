@@ -89,9 +89,18 @@ class S:
         return max(self.pv + batt_signed - self.wb_leistung - self.netz, 0)
     @property
     def pgrid(self):
-        # If clearly importing from grid, there can be no surplus
+        # Debounce: only kill surplus after sustained grid import (avoids brief blips)
         if self.netz < -50:
-            return 0
+            if not hasattr(st, '_netz_import_since'):
+                st._netz_import_since = time.time()
+            if time.time() - st._netz_import_since > 3:
+                return 0
+            else:
+                # Still in grace period — use last valid pGrid if available
+                if st.d and st.d.pgrid > 0:
+                    return st.d.pgrid
+        else:
+            st._netz_import_since = None
         raw = 0
         if self.bat_ch:
             raw = max(self.netz+self.wb_leistung, 0)
