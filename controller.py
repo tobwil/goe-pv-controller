@@ -143,12 +143,13 @@ class Ctrl:
             self.pid.reset();self.smooth_amps=0;self.ld=d;return d
         # ── Phase switching ──
         pc=c["phase_switch"]
-        can=(time.time()-self.lsw)>pc["min_switch_interval"]
-        if can:
-            if self.ph==1 and s.pgrid>=pc["hysteresis_up"]:
-                self.ph=3;self.lsw=time.time();d.action="SW";d.reason=f"1->3ph (>={pc['hysteresis_up']}W)"
-            elif self.ph==3 and s.pgrid<pc["hysteresis_down"]:
-                self.ph=1;self.lsw=time.time();d.action="SW";d.reason=f"3->1ph (<{pc['hysteresis_down']}W)"
+        now=time.time()
+        # 1→3: immediate when surplus is there (no cooldown — don't waste sun)
+        if self.ph==1 and s.pgrid>=pc["hysteresis_up"]:
+            self.ph=3;self.lsw=now;d.action="SW";d.reason=f"1->3ph (>={pc['hysteresis_up']}W)"
+        # 3→1: only after cooldown (don't drop phases on brief clouds)
+        elif self.ph==3 and s.pgrid<pc["hysteresis_down"] and (now-self.lsw)>pc["min_switch_interval"]:
+            self.ph=1;self.lsw=now;d.action="SW";d.reason=f"3->1ph (<{pc['hysteresis_down']}W)"
         d.target_ph=self.ph
         voltage=230; phases=d.target_ph
         # Direct amp from surplus (no PID)

@@ -213,7 +213,7 @@ function drawChart(history){
   for(const p of history){
     if(p.pv>maxPV)maxPV=p.pv;
   }
-  maxPV=Math.ceil(maxPV/2000)*2000||4000;
+  maxPV=Math.ceil(maxPV/2000)*2000+2000;
   if(maxPV<4000)maxPV=4000;
 
   function x(i){return pad.left+(i/(history.length-1))*pw}
